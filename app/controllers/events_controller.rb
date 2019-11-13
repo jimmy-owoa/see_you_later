@@ -35,13 +35,13 @@ class EventsController < ApplicationController
 
   # DELETE /events/{eventname}
   def destroy
-    @event.destroy
+    render json: { status: :deleted } if @event.destroy
   end
 
   private
 
   def find_event
-    @event = Event.find(params[:id])
+    @event = Event.find(params[:_id])
   rescue ActiveRecord::RecordNotFound
     render json: { errors: "Event not found" }, status: :not_found
   end
