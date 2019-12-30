@@ -1,4 +1,5 @@
 class EventsController < ApplicationController
+  before_action :sanitize_date_params, except: %i[show index destroy]
   before_action :find_event, except: %i[create index]
 
   # GET /events
@@ -9,15 +10,28 @@ class EventsController < ApplicationController
 
   # GET /events/{eventname}
   def show
+    invitations = []
+    @event.invitations.each do |invitation|
+      user = invitation.user
+      invitations << {
+        id: invitation.id,
+        name: user.name,
+        lastname: user.lastname,
+        accepted: invitation.accepted ? "Aceptado" : "Pendiente",
+        phone: user.phone,
+      }
+    end
     data = { event: @event,
-            users: @event.users }
+             invitations: invitations }
     render json: data, status: :ok
   end
 
   # POST /events
   def create
     @event = Event.new(event_params)
+    binding.pry
     if @event.save
+      create_invitations
       render json: @event, status: :created
     else
       render json: { errors: @event.errors.full_messages },
@@ -39,6 +53,16 @@ class EventsController < ApplicationController
   end
 
   private
+
+  def create_invitations
+    if params[:invitations].present?
+      params[:invitations].each do |user_id| Invitation.create(user_id: user_id, event_id: @event.id, accepted: false) end
+    end
+  end
+
+  def sanitize_date_params
+    params[:date] = params[:date].to_datetime
+  end
 
   def find_event
     @event = Event.find(params[:_id])

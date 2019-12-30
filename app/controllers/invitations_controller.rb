@@ -10,7 +10,8 @@ class InvitationsController < ApplicationController
   # GET /invitations/{invitationname}
   def show
     data = { invitation: @invitation,
-            users: @invitation.users }
+            user: @invitation.user,
+            event: @invitation.event }
     render json: data, status: :ok
   end
 
