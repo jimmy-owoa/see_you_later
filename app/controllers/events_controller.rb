@@ -5,37 +5,49 @@ class EventsController < ApplicationController
   # GET /events
   def index
     @events = Event.all
-    render json: @events, status: :ok
+    data = []
+    @events.each do |event|
+      data << {
+        id: event.id,
+        title: event.title,
+        date: event.date.strftime("%d/%m/%Y · %H:%M"),
+      }
+    end
+    render json: data, status: :ok
   end
 
   # GET /events/{eventname}
   def show
     invitations = []
+    accepted = 0
     @event.invitations.each do |invitation|
       user = invitation.user
+      accepted += 1 if invitation.accepted
       invitations << {
         id: invitation.id,
         name: user.name,
         lastname: user.lastname,
-        accepted: invitation.accepted ? "Aceptado" : "Pendiente",
+        accepted: invitation.accepted,
+        status: invitation.accepted,
         phone: user.phone,
       }
     end
     data = { event: @event,
-             invitations: invitations }
+             invitations: invitations,
+             accepted_users: accepted }
     render json: data, status: :ok
   end
 
   # POST /events
   def create
-    @event = Event.new(event_params)
-    binding.pry
-    if @event.save
-      create_invitations
-      render json: @event, status: :created
-    else
-      render json: { errors: @event.errors.full_messages },
-             status: :unprocessable_entity
+    params[:dates].each do |date|
+      @event = Event.new(title: params[:title], date: date)
+      if @event.save
+        create_invitations
+      else
+        render json: { errors: @event.errors.full_messages },
+               status: :unprocessable_entity
+      end
     end
   end
 
@@ -61,7 +73,11 @@ class EventsController < ApplicationController
   end
 
   def sanitize_date_params
-    params[:date] = params[:date].to_datetime
+    dates = []
+    params[:dates].each do |date|
+      dates << date.to_datetime
+    end
+    params[:dates] = dates
   end
 
   def find_event
@@ -71,6 +87,6 @@ class EventsController < ApplicationController
   end
 
   def event_params
-    params.permit(:title, :date)
+    params.permit(:title, :dates)
   end
 end

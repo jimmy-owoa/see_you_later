@@ -7,6 +7,11 @@ class InvitationsController < ApplicationController
     render json: @invitations, status: :ok
   end
 
+  def change_response
+    @invitation.update(accepted: !@invitation.accepted)
+    render json: { message: "Estado cambiado" }, status: 200
+  end
+
   # GET /invitations/{invitationname}
   def show
     data = { invitation: @invitation,
