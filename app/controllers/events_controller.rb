@@ -30,7 +30,7 @@ class EventsController < ApplicationController
           id: invitation.id,
           user_id: user.id,
           date: invitation.date,
-          beauty_date: invitation.date.strftime("%d/%m/%Y · %H:%M"),
+          beauty_date: I18n.l(invitation.date, format: "%-d de %B - %H:%M"),
           accepted: invitation.accepted,
         }
       end
