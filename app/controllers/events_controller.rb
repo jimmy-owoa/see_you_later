@@ -10,7 +10,7 @@ class EventsController < ApplicationController
       data << {
         id: event.id,
         title: event.title,
-        date: event.date.strftime("%d/%m/%Y · %H:%M"),
+        slug: event.slug,
       }
     end
     render json: data, status: :ok
@@ -18,36 +18,44 @@ class EventsController < ApplicationController
 
   # GET /events/{eventname}
   def show
-    invitations = []
-    accepted = 0
-    @event.invitations.each do |invitation|
-      user = invitation.user
-      accepted += 1 if invitation.accepted
-      invitations << {
-        id: invitation.id,
+    data = []
+    final_data = []
+    beauty_dates = []
+    user_ids = @event.invitations.pluck(:user_id).uniq
+    users = User.where(id: user_ids)
+    users.each do |user|
+      invitations = []
+      @event.invitations.where(user_id: user.id).order(:date).each do |invitation|
+        invitations << {
+          id: invitation.id,
+          user_id: user.id,
+          date: invitation.date,
+          beauty_date: invitation.date.strftime("%d/%m/%Y · %H:%M"),
+          accepted: invitation.accepted,
+        }
+      end
+      beauty_dates << invitations.pluck(:beauty_date)
+      data << {
+        id: user.id,
         name: user.name,
         lastname: user.lastname,
-        accepted: invitation.accepted,
-        status: invitation.accepted,
-        phone: user.phone,
+        invitations: invitations,
+        total_accepted: invitations.select { |a| a[:accepted] == true }.count,
       }
     end
-    data = { event: @event,
-             invitations: invitations,
-             accepted_users: accepted }
-    render json: data, status: :ok
+    final_data << { title: @event.title, data: data, beauty_dates: beauty_dates.uniq.flatten.uniq }
+    render json: final_data[0], status: :ok
   end
 
   # POST /events
   def create
-    params[:dates].each do |date|
-      @event = Event.new(title: params[:title], date: date)
-      if @event.save
-        create_invitations
-      else
-        render json: { errors: @event.errors.full_messages },
-               status: :unprocessable_entity
-      end
+    @event = Event.new(event_params)
+    if @event.save
+      create_invitations
+      render json: @event, status: 200
+    else
+      render json: { errors: @event.errors.full_messages },
+             status: :unprocessable_entity
     end
   end
 
@@ -68,7 +76,11 @@ class EventsController < ApplicationController
 
   def create_invitations
     if params[:invitations].present?
-      params[:invitations].each do |user_id| Invitation.create(user_id: user_id, event_id: @event.id, accepted: false) end
+      params[:invitations].each do |user_id|
+        params[:dates].each_with_index do |date, i|
+          Invitation.create(user_id: user_id, event_id: @event.id, accepted: false, date: date)
+        end
+      end
     end
   end
 
@@ -81,12 +93,12 @@ class EventsController < ApplicationController
   end
 
   def find_event
-    @event = Event.find(params[:_id])
+    @event = Event.find_by(slug: params[:_slug])
   rescue ActiveRecord::RecordNotFound
     render json: { errors: "Event not found" }, status: :not_found
   end
 
   def event_params
-    params.permit(:title, :dates)
+    params.permit(:title)
   end
 end
